@@ -16,6 +16,7 @@
         .risk-low { border-left: 5px solid #28a745; }
         #manualLocation { display: none; margin-top: 10px; }
         #locationError { display: none; }
+        .spinner-border { width: 1.5rem; height: 1.5rem; }
     </style>
 </head>
 
@@ -79,7 +80,10 @@
                 </div>
                 <div class="col-md-4">
                     <button class="btn btn-success mt-3" onclick="calcularRendimiento()">Calcular</button>
-                    <button class="btn btn-primary mt-3" onclick="obtenerClimaPorUbicacion()">Usar mi ubicación</button>
+                    <button class="btn btn-primary mt-3" onclick="obtenerClimaPorUbicacion()" id="locationBtn">
+                        <span id="btnText">Usar mi ubicación</span>
+                        <span id="btnSpinner" class="spinner-border spinner-border-sm" style="display: none;"></span>
+                    </button>
                 </div>
             </div>
             <div id="manualLocation" class="mt-3">
@@ -92,7 +96,10 @@
                         <input type="text" id="lonInput" class="form-control mb-2" placeholder="Longitud (ej: -86.5)">
                     </div>
                 </div>
-                <button class="btn btn-info" onclick="usarUbicacionManual()">Aplicar</button>
+                <button class="btn btn-info" onclick="usarUbicacionManual()" id="manualBtn">
+                    <span id="manualBtnText">Aplicar</span>
+                    <span id="manualBtnSpinner" class="spinner-border spinner-border-sm" style="display: none;"></span>
+                </button>
             </div>
             <div class="mt-3" id="resultado"></div>
         </div>
@@ -129,77 +136,91 @@
         let userMarker = null;
         let accuracyCircle = null;
 
+        // Mostrar spinner en botón
+        function showSpinner(buttonId) {
+            document.getElementById(`${buttonId}Text`).style.display = 'none';
+            document.getElementById(`${buttonId}Spinner`).style.display = 'inline-block';
+        }
+
+        // Ocultar spinner en botón
+        function hideSpinner(buttonId) {
+            document.getElementById(`${buttonId}Text`).style.display = 'inline-block';
+            document.getElementById(`${buttonId}Spinner`).style.display = 'none';
+        }
+
         // Obtener clima por ubicación con alta precisión
-        function obtenerClimaPorUbicacion() {
+        async function obtenerClimaPorUbicacion() {
+            showSpinner('btn');
+            document.getElementById('resultado').innerHTML = '<div class="alert alert-info">Buscando tu ubicación...</div>';
+            
             if (navigator.geolocation) {
-                document.getElementById('resultado').innerHTML = '<div class="alert alert-info">Buscando tu ubicación...</div>';
-                
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const lat = position.coords.latitude;
-                        const lon = position.coords.longitude;
-                        const accuracy = position.coords.accuracy; // Precisión en metros
-                        
-                        // Actualizar el mapa
-                        map.setView([lat, lon], 13); // Zoom más cercano
-                        
-                        // Eliminar marcadores anteriores
-                        if (userMarker) map.removeLayer(userMarker);
-                        if (accuracyCircle) map.removeLayer(accuracyCircle);
-                        
-                        // Añadir marcador de ubicación
-                        userMarker = L.marker([lat, lon]).addTo(map)
-                            .bindPopup('Tu ubicación')
-                            .openPopup();
-                        
-                        // Añadir círculo de precisión (opcional)
-                        accuracyCircle = L.circle([lat, lon], {
-                            radius: accuracy,
-                            color: '#0078ff',
-                            fillOpacity: 0.2
-                        }).addTo(map);
-                        
-                        // Mostrar advertencia si la precisión es baja (>100m)
-                        if (accuracy > 100) {
-                            document.getElementById('locationError').style.display = 'block';
-                        } else {
-                            document.getElementById('locationError').style.display = 'none';
-                        }
-                        
-                        // Obtener datos del clima (simulado para el ejemplo)
-                        obtenerDatosClima(lat, lon);
-                    },
-                    (error) => {
-                        let errorMsg = "";
-                        switch(error.code) {
-                            case error.PERMISSION_DENIED:
-                                errorMsg = "Permiso denegado. Usa la opción manual.";
-                                break;
-                            case error.POSITION_UNAVAILABLE:
-                                errorMsg = "Ubicación no disponible. Usa la opción manual.";
-                                break;
-                            case error.TIMEOUT:
-                                errorMsg = "Tiempo de espera agotado. Intenta de nuevo.";
-                                break;
-                            default:
-                                errorMsg = "Error desconocido.";
-                        }
-                        
-                        document.getElementById('resultado').innerHTML = `
-                            <div class="alert alert-danger">
-                                <strong>Error:</strong> ${errorMsg}
-                            </div>
-                        `;
-                        
-                        // Mostrar opción manual
-                        document.getElementById('manualLocation').style.display = 'block';
-                    },
-                    {
-                        enableHighAccuracy: true, // Forzar GPS si está disponible
-                        timeout: 10000, // 10 segundos de espera
-                        maximumAge: 0 // No usar caché
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
+                        });
+                    });
+                    
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+                    
+                    // Actualizar el mapa
+                    map.setView([lat, lon], 13);
+                    
+                    // Eliminar marcadores anteriores
+                    if (userMarker) map.removeLayer(userMarker);
+                    if (accuracyCircle) map.removeLayer(accuracyCircle);
+                    
+                    // Añadir marcador de ubicación
+                    userMarker = L.marker([lat, lon]).addTo(map)
+                        .bindPopup('Tu ubicación')
+                        .openPopup();
+                    
+                    // Añadir círculo de precisión
+                    accuracyCircle = L.circle([lat, lon], {
+                        radius: accuracy,
+                        color: '#0078ff',
+                        fillOpacity: 0.2
+                    }).addTo(map);
+                    
+                    // Mostrar advertencia si la precisión es baja
+                    if (accuracy > 100) {
+                        document.getElementById('locationError').style.display = 'block';
+                    } else {
+                        document.getElementById('locationError').style.display = 'none';
                     }
-                );
+                    
+                    // Obtener datos del clima reales
+                    await obtenerDatosClimaReales(lat, lon);
+                    
+                } catch (error) {
+                    let errorMsg = "";
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMsg = "Permiso denegado. Usa la opción manual.";
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMsg = "Ubicación no disponible. Usa la opción manual.";
+                            break;
+                        case error.TIMEOUT:
+                            errorMsg = "Tiempo de espera agotado. Intenta de nuevo.";
+                            break;
+                        default:
+                            errorMsg = "Error desconocido.";
+                    }
+                    
+                    document.getElementById('resultado').innerHTML = `
+                        <div class="alert alert-danger">
+                            <strong>Error:</strong> ${errorMsg}
+                        </div>
+                    `;
+                    
+                    // Mostrar opción manual
+                    document.getElementById('manualLocation').style.display = 'block';
+                }
             } else {
                 document.getElementById('resultado').innerHTML = `
                     <div class="alert alert-warning">
@@ -208,10 +229,12 @@
                 `;
                 document.getElementById('manualLocation').style.display = 'block';
             }
+            hideSpinner('btn');
         }
 
         // Función para usar ubicación manual
-        function usarUbicacionManual() {
+        async function usarUbicacionManual() {
+            showSpinner('manualBtn');
             const lat = parseFloat(document.getElementById('latInput').value);
             const lon = parseFloat(document.getElementById('lonInput').value);
             
@@ -221,6 +244,7 @@
                         Ingresa coordenadas válidas.
                     </div>
                 `;
+                hideSpinner('manualBtn');
                 return;
             }
             
@@ -230,44 +254,110 @@
                 .bindPopup('Ubicación manual')
                 .openPopup();
             
-            obtenerDatosClima(lat, lon);
+            await obtenerDatosClimaReales(lat, lon);
+            hideSpinner('manualBtn');
         }
 
-        // Función simulada para obtener datos del clima (reemplaza con API real)
-        function obtenerDatosClima(lat, lon) {
-            // SIMULACIÓN: Datos aleatorios para el ejemplo
-            const temp = (Math.random() * 10 + 20).toFixed(1); // 20-30°C
-            const lluvia = (Math.random() * 20).toFixed(1); // 0-20mm
-            
-            // Actualizar controles
-            document.getElementById('temp').value = temp;
-            document.getElementById('tempValue').textContent = `${temp} °C`;
-            document.getElementById('lluvia').value = lluvia;
-            document.getElementById('lluviaValue').textContent = `${lluvia} mm`;
-            
-            document.getElementById('resultado').innerHTML = `
-                <div class="alert alert-success">
-                    <strong>Ubicación:</strong> Lat ${lat.toFixed(4)}, Lon ${lon.toFixed(4)}<br>
-                    <strong>Temperatura simulada:</strong> ${temp} °C<br>
-                    <strong>Lluvia simulada:</strong> ${lluvia} mm<br>
-                    <small class="text-muted">Nota: Usando datos de ejemplo. Implementa una API real para datos precisos.</small>
-                </div>
-            `;
+        // Función para obtener datos climáticos reales de OpenWeatherMap
+        async function obtenerDatosClimaReales(lat, lon) {
+            try {
+                // NOTA: Reemplaza 'TU_API_KEY' con tu API key real de OpenWeatherMap
+                const apiKey = 'TU_API_KEY';
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`;
+                
+                document.getElementById('resultado').innerHTML = '<div class="alert alert-info">Obteniendo datos climáticos...</div>';
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if(data.cod === 200) {
+                    const temp = data.main.temp;
+                    // La lluvia puede venir en diferentes formatos en la API
+                    let lluvia = 0;
+                    if(data.rain) {
+                        lluvia = data.rain['1h'] || data.rain['3h'] || 0;
+                    }
+                    const humedad = data.main.humidity;
+                    const descripcion = data.weather[0].description;
+                    const icono = data.weather[0].icon;
+                    
+                    // Actualizar controles
+                    document.getElementById('temp').value = temp;
+                    document.getElementById('tempValue').textContent = `${temp} °C`;
+                    document.getElementById('lluvia').value = lluvia;
+                    document.getElementById('lluviaValue').textContent = `${lluvia} mm`;
+                    
+                    document.getElementById('resultado').innerHTML = `
+                        <div class="alert alert-success">
+                            <div class="d-flex align-items-center">
+                                <img src="https://openweathermap.org/img/wn/${icono}.png" alt="${descripcion}">
+                                <h5 class="mb-0 ms-2">${descripcion}</h5>
+                            </div>
+                            <strong>Ubicación:</strong> Lat ${lat.toFixed(4)}, Lon ${lon.toFixed(4)}<br>
+                            <strong>Temperatura:</strong> ${temp} °C<br>
+                            <strong>Lluvia (última hora):</strong> ${lluvia} mm<br>
+                            <strong>Humedad:</strong> ${humedad}%<br>
+                            <small class="text-muted">Datos proporcionados por OpenWeatherMap</small>
+                        </div>
+                    `;
+                } else {
+                    throw new Error(data.message || 'Error al obtener datos climáticos');
+                }
+            } catch (error) {
+                document.getElementById('resultado').innerHTML = `
+                    <div class="alert alert-danger">
+                        Error al obtener datos climáticos: ${error.message}<br>
+                        <small>Nota: El desarrollador debe configurar una API key válida de OpenWeatherMap</small>
+                    </div>
+                `;
+                
+                // Usar datos de ejemplo como fallback
+                const temp = (25 + (Math.random() * 10 - 5)).toFixed(1); // 20-30°C con variación
+                const lluvia = (Math.random() * 10).toFixed(1); // 0-10mm
+                
+                document.getElementById('temp').value = temp;
+                document.getElementById('tempValue').textContent = `${temp} °C`;
+                document.getElementById('lluvia').value = lluvia;
+                document.getElementById('lluviaValue').textContent = `${lluvia} mm`;
+            }
         }
 
         // Lógica del Simulador
         function calcularRendimiento() {
-            const lluvia = document.getElementById('lluvia').value;
-            const temp = document.getElementById('temp').value;
+            const lluvia = parseFloat(document.getElementById('lluvia').value);
+            const temp = parseFloat(document.getElementById('temp').value);
             
-            // Modelo predictivo simple (regresión lineal)
-            const rendimiento = (0.6 * lluvia) - (2 * temp) + 30;
+            // Modelo predictivo mejorado
+            let rendimiento;
+            if (temp < 10) {
+                rendimiento = 20; // Muy frío para cultivos
+            } else if (temp > 35) {
+                rendimiento = 30; // Muy caliente
+            } else {
+                // Modelo basado en condiciones óptimas
+                const tempOptima = 25;
+                const lluviaOptima = 300;
+                
+                const factorTemp = 1 - Math.abs(temp - tempOptima) / 15;
+                const factorLluvia = 1 - Math.abs(lluvia - lluviaOptima) / 500;
+                
+                rendimiento = 50 + (factorTemp * 20) + (factorLluvia * 30);
+            }
+            
+            // Ajustar rango
+            rendimiento = Math.max(10, Math.min(100, rendimiento));
+            
             const riesgo = rendimiento < 40 ? 'Alto 🔴' : rendimiento < 60 ? 'Medio 🟡' : 'Bajo 🟢';
             
             document.getElementById('resultado').innerHTML = `
                 <div class="alert alert-info">
+                    <h5>Resultado de Simulación</h5>
                     <strong>Rendimiento Estimado:</strong> ${rendimiento.toFixed(1)}%<br>
-                    <strong>Nivel de Riesgo:</strong> ${riesgo}
+                    <strong>Nivel de Riesgo:</strong> ${riesgo}<br>
+                    <strong>Condiciones:</strong><br>
+                    - Temperatura: ${temp} °C<br>
+                    - Lluvia: ${lluvia} mm<br>
+                    <small class="text-muted">Modelo basado en condiciones óptimas para cultivos comunes</small>
                 </div>
             `;
         }
