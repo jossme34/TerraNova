@@ -258,109 +258,83 @@
             hideSpinner('manualBtn');
         }
 
-// Función para obtener datos climáticos reales de OpenWeatherMap
 async function obtenerDatosClimaReales(lat, lon) {
-    const apiKey = '3f7cbd3564e22433b48e31ac5a621bb7'; // ← CLAVE AQUÍ
+    // 1. Pega aquí tu NUEVA API key (tras revocar la anterior)
+    const apiKey = 'tu_nueva_api_key_aqui'; // 32 caracteres alfanuméricos
     
-    if(!apiKey || apiKey.length !== 32) {
-        mostrarError('Formato de API key inválido');
+    // 2. Verificación estricta
+    if(!apiKey || apiKey === 'tu_nueva_api_key_aqui') {
+        mostrarError('⚠️ Reemplaza "tu_nueva_api_key_aqui" con tu clave real');
         return;
     }
 
     try {
-        const response = await fetch(
-            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`
-        );
+        // 3. URL corregida (con verificación de errores)
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`;
+        const response = await fetch(url);
         
+        // 4. Manejo específico de errores HTTP
         if(response.status === 401) {
-            mostrarError('API key no válida. Verifica tu clave en OpenWeatherMap');
-            return;
+            throw new Error('API key inválida. Genera una nueva en OpenWeatherMap');
+        }
+        if(!response.ok) {
+            throw new Error(`Error ${response.status}: ${response.statusText}`);
         }
         
-        // Procesar datos exitosos...
+        // 5. Procesamiento de datos exitoso
+        const data = await response.json();
+        mostrarDatosReales(data, lat, lon);
         
     } catch (error) {
-        mostrarError(`Error de conexión: ${error.message}`);
+        mostrarError(`Error: ${error.message}`);
     }
 }
-        
-        const data = await response.json();
-        
-        // Procesar datos climáticos
-        const temp = data.main.temp;
-        let lluvia = 0;
-        if(data.rain) {
-            lluvia = data.rain['1h'] || data.rain['3h'] || 0;
-        }
-        const humedad = data.main.humidity;
-        const descripcion = data.weather[0].description;
-        const icono = data.weather[0].icon;
-        
-        // Actualizar controles
-        document.getElementById('temp').value = temp;
-        document.getElementById('tempValue').textContent = `${temp} °C`;
-        document.getElementById('lluvia').value = lluvia;
-        document.getElementById('lluviaValue').textContent = `${lluvia} mm`;
-        
-        // Mostrar resultados
-        document.getElementById('resultado').innerHTML = `
-            <div class="alert alert-success">
-                <div class="d-flex align-items-center">
-                    <img src="https://openweathermap.org/img/wn/${icono}.png" alt="${descripcion}" style="width: 50px;">
-                    <div>
-                        <h5 class="mb-0 ms-2">${descripcion.charAt(0).toUpperCase() + descripcion.slice(1)}</h5>
-                        <small class="text-muted">Actualizado: ${new Date().toLocaleTimeString()}</small>
-                    </div>
-                </div>
-                <hr>
-                <div class="row">
-                    <div class="col-md-6">
-                        <strong>🌡 Temperatura:</strong> ${temp} °C<br>
-                        <strong>💧 Humedad:</strong> ${humedad}%
-                    </div>
-                    <div class="col-md-6">
-                        <strong>🌧 Lluvia (1h):</strong> ${lluvia} mm<br>
-                        <strong>📍 Ubicación:</strong> ${lat.toFixed(4)}, ${lon.toFixed(4)}
-                    </div>
-                </div>
-                <hr>
-                <small class="text-muted">Datos proporcionados por OpenWeatherMap</small>
-            </div>
-        `;
-        
-    } catch (error) {
-        // Manejo mejorado de errores
-        let errorMessage = error.message;
-        let solucion = '';
-        
-        if(errorMessage.includes('Invalid API key')) {
-            errorMessage = 'API key no válida';
-            solucion = 'Regístrate en OpenWeatherMap para obtener una API key válida y reemplázala en el código.';
-        } else if(errorMessage.includes('API key no configurada')) {
-            solucion = 'El desarrollador debe configurar una API key válida de OpenWeatherMap en el código.';
-        } else if(errorMessage.includes('Failed to fetch')) {
-            errorMessage = 'Error de conexión';
-            solucion = 'Verifica tu conexión a internet. Si el problema persiste, el servicio puede estar temporalmente no disponible.';
-        }
-        
-        document.getElementById('resultado').innerHTML = `
-            <div class="alert alert-danger">
-                <h5>😕 Error al obtener datos climáticos</h5>
-                <strong>${errorMessage}</strong><br><br>
-                ${solucion ? `<p>${solucion}</p>` : ''}
-                <small class="text-muted">Usando datos de ejemplo para continuar...</small>
-            </div>
-        `;
-        
-        // Usar datos de ejemplo como fallback
-        const tempEjemplo = (25 + (Math.random() * 10 - 5)).toFixed(1);
-        const lluviaEjemplo = (Math.random() * 10).toFixed(1);
-        
-        document.getElementById('temp').value = tempEjemplo;
-        document.getElementById('tempValue').textContent = `${tempEjemplo} °C`;
-        document.getElementById('lluvia').value = lluviaEjemplo;
-        document.getElementById('lluviaValue').textContent = `${lluviaEjemplo} mm`;
-    }
+
+// Función para mostrar datos reales
+function mostrarDatosReales(data, lat, lon) {
+    const temp = data.main.temp;
+    const lluvia = data.rain ? (data.rain['1h'] || 0) : 0;
+    const humedad = data.main.humidity;
+    const icono = data.weather[0].icon;
+    
+    // Actualizar controles
+    document.getElementById('temp').value = temp;
+    document.getElementById('tempValue').textContent = `${temp} °C`;
+    document.getElementById('lluvia').value = lluvia;
+    document.getElementById('lluviaValue').textContent = `${lluvia} mm`;
+    
+    // Mostrar resultados
+    document.getElementById('resultado').innerHTML = `
+        <div class="alert alert-success">
+            <img src="https://openweathermap.org/img/wn/${icono}.png" alt="Icono clima">
+            <strong>Temperatura:</strong> ${temp} °C<br>
+            <strong>Lluvia (1h):</strong> ${lluvia} mm<br>
+            <strong>Humedad:</strong> ${humedad}%<br>
+            <small>Ubicación: ${lat.toFixed(4)}, ${lon.toFixed(4)}</small>
+        </div>
+    `;
+}
+
+// Función para errores
+function mostrarError(mensaje) {
+    document.getElementById('resultado').innerHTML = `
+        <div class="alert alert-danger">
+            <h5>❌ Error</h5>
+            <p>${mensaje}</p>
+            <p>Solución:</p>
+            <ol>
+                <li>Ve a <a href="https://openweathermap.org/api_keys" target="_blank">OpenWeatherMap</a></li>
+                <li>Genera una nueva API key</li>
+                <li>Pégala en el código reemplazando "tu_nueva_api_key_aqui"</li>
+            </ol>
+        </div>
+    `;
+    
+    // Datos de ejemplo como fallback
+    document.getElementById('temp').value = 25;
+    document.getElementById('tempValue').textContent = "25 °C";
+    document.getElementById('lluvia').value = 5;
+    document.getElementById('lluviaValue').textContent = "5 mm";
 }
 
         // Lógica del Simulador
