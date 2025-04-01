@@ -260,31 +260,29 @@
 
 // Función para obtener datos climáticos reales de OpenWeatherMap
 async function obtenerDatosClimaReales(lat, lon) {
+    const apiKey = '3f7cbd3564e22433b48e31ac5a621bb7'; // ← CLAVE AQUÍ
+    
+    if(!apiKey || apiKey.length !== 32) {
+        mostrarError('Formato de API key inválido');
+        return;
+    }
+
     try {
-        // Reemplaza esto con tu API key REAL obtenida de OpenWeatherMap
-        const apiKey = '3f7cbd3564e22433b48e31ac5a621bb7'; // ← ESTO ES LO QUE DEBES CAMBIAR
+        const response = await fetch(
+            `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`
+        );
         
-        // Verificar si la API key está configurada
-        if(!apiKey || apiKey === '3f7cbd3564e22433b48e31ac5a621bb7') {
-            throw new Error('API key no configurada. Regístrate en OpenWeatherMap para obtener una.');
+        if(response.status === 401) {
+            mostrarError('API key no válida. Verifica tu clave en OpenWeatherMap');
+            return;
         }
         
-        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=es`;
+        // Procesar datos exitosos...
         
-        document.getElementById('resultado').innerHTML = `
-            <div class="alert alert-info d-flex align-items-center">
-                <div class="spinner-border me-2" role="status"></div>
-                Obteniendo datos climáticos actuales...
-            </div>
-        `;
-        
-        const response = await fetch(url);
-        
-        // Verificar si la respuesta es OK
-        if(!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || 'Error en la respuesta de la API');
-        }
+    } catch (error) {
+        mostrarError(`Error de conexión: ${error.message}`);
+    }
+}
         
         const data = await response.json();
         
